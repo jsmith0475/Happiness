@@ -1,0 +1,231 @@
+##
+# A Technical Primer on Causality
+# https://medium.com/@akelleh/a-technical-primer-on-causality-181db2575e41
+
+
+# X -> Y -> Z
+library(tibble)
+library(ggplot2)
+
+size <- 1000
+x <- rnorm(size, mean = 0, sd = 1)
+y <- x + rnorm(size, mean = 0, sd = 1)
+z <- y + rnorm(size, mean = 0, sd = 1)
+str(x)
+class(x)
+head(x)
+
+
+# create a tibble dataframe
+data_model <- tibble(x = x, y = y, z = z)
+class(data_model)
+str(data_model)
+head(data_model)
+
+# Three ways to show relationships
+pairs(data_model)
+data_model %>% pairs()
+pairs(~ data_model$x + data_model$y + data_model$z)
+plot(data_model) 
+
+# Function to add histograms
+panel.hist <- function(x, ...) {
+  usr <- par("usr")
+  on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5))
+  his <- hist(x, plot = FALSE)
+  breaks <- his$breaks
+  nB <- length(breaks)
+  y <- his$counts
+  y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col = rgb(0, 1, 1, alpha = 0.5), ...)
+  # lines(density(x), col = 2, lwd = 2) # Uncomment to add density lines
+}
+
+# Creating the scatter plot matrix
+data_model %>% pairs(.,
+      upper.panel = NULL,         # Disabling the upper panel
+      diag.panel = panel.hist)    # Adding the histograms
+
+##
+# Linear Regession Z ~ Y
+lm_z_y <- lm(z ~ y, data = data_model)
+str(lm_z_y)
+summary(lm_z_y)
+# Call:
+#   lm(formula = z ~ y, data = X)
+# 
+# Residuals:
+#   Min       1Q   Median       3Q      Max 
+# -3.02121 -0.65382 -0.01293  0.67861  3.14919 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)  0.83561    0.05536   15.09   <2e-16 ***
+#   y            1.04133    0.02240   46.48   <2e-16 ***
+#   ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.004 on 998 degrees of freedom
+# Multiple R-squared:  0.684,	Adjusted R-squared:  0.6837 
+# F-statistic:  2160 on 1 and 998 DF,  p-value: < 2.2e-16
+
+plot(lm_z_y$residuals, pch = 16, col = "blue") #Plot the results
+ggplot(data = lm_z_y, aes(x = .fitted, y = .resid)) +
+  geom_point()
+
+ggplot(data=lm_z_y, aes(.resid)) + 
+  geom_histogram()
+
+
+# Linear Regession Z ~ X
+lm_z_x <- lm(z ~ x, data = data_model)
+summary(lm_z_x)
+# Call:
+#   lm(formula = z ~ x, data = X)
+# 
+# Residuals:
+#   Min      1Q  Median      3Q     Max 
+# -4.5742 -1.0127 -0.0335  1.0248  4.5884 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)  1.88715    0.06495   29.05   <2e-16 ***
+#   x            1.03362    0.04513   22.90   <2e-16 ***
+#   ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.447 on 998 degrees of freedom
+# Multiple R-squared:  0.3445,	Adjusted R-squared:  0.3439 
+# F-statistic: 524.6 on 1 and 998 DF,  p-value: < 2.2e-16
+
+# Linear Regession Z ~ X + Y
+lm_z_x_y <- lm(z ~ x + y, data = data_model)
+summary(lm_z_x_y)
+
+# Call:
+#   lm(formula = z ~ x + y, data = X)
+# 
+# Residuals:
+#   Min       1Q   Median       3Q      Max 
+# -3.04133 -0.64798 -0.02846  0.67179  3.12749 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)  0.83516    0.05538  15.082   <2e-16 ***
+#   x            0.03517    0.04372   0.804    0.421    
+#   y            1.02380    0.03126  32.748   <2e-16 ***
+#   ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.005 on 997 degrees of freedom
+# Multiple R-squared:  0.6842,	Adjusted R-squared:  0.6836 
+# F-statistic:  1080 on 2 and 997 DF,  p-value: < 2.2e-16
+
+
+############################################################
+# Y->X, Y->Z (common cause, fork)
+
+size2 <- 1000
+y2 <- rnorm(size2, mean = 0, sd = 1)
+x2 <- y2 + rnorm(size2, mean = 0, sd = 1)
+z2 <- y2 + rnorm(size2, mean = 0, sd = 1)
+data_fork <- tibble(x=x2, y=y2, z=z2 )
+str(data_fork)
+
+# Plot for fork
+data_fork %>% pairs(.,
+      upper.panel = NULL,         # Disabling the upper panel
+      diag.panel = panel.hist)    # Adding the histograms
+# Notice that everything is correlated. If you regressed Z on X, you 
+# would indeed find a non-zero regression coefficient, even though 
+# there’s no causal relationship between them at all! This is called 
+# confounding bias
+lm_fork <- lm(z ~ x + y ,data = data_fork)
+summary(lm_fork)
+# Call:
+#   lm(formula = z ~ x + y, data = data_fork)
+# 
+# Residuals:
+#   Min      1Q  Median      3Q     Max 
+# -3.3068 -0.6624  0.0292  0.6886  2.8796 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)  0.01918    0.03179   0.603    0.546    
+# x            0.01127    0.03231   0.349    0.727    
+# y            0.99453    0.04489  22.156   <2e-16 ***
+#   ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.005 on 997 degrees of freedom
+# Multiple R-squared:  0.4975,	Adjusted R-squared:  0.4965 
+# F-statistic: 493.5 on 2 and 997 DF,  p-value: < 2.2e-16
+
+
+############################################################
+# X -> Y, Z -> Y (common effect)
+
+size3<- 1000
+x3<-rnorm(size3)
+z3<-rnorm(size3)
+y3<-x3 + z3 + rnorm(size3)
+X_collider <- tibble(x=x3, y=y3, z=z3)
+
+lm_collider <- lm(z ~ x, data = X_collider)
+summary(lm_collider)
+# Call:
+#   lm(formula = z ~ x, data = X_collider)
+# 
+# Residuals:
+#   Min       1Q   Median       3Q      Max 
+# -3.10902 -0.65680  0.02891  0.64607  2.97216 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)
+# (Intercept) -0.03659    0.03079  -1.188    0.235
+# x           -0.02703    0.03063  -0.882    0.378
+# 
+# Residual standard error: 0.9736 on 998 degrees of freedom
+# Multiple R-squared:  0.0007797,	Adjusted R-squared:  -0.0002215 
+# F-statistic: 0.7788 on 1 and 998 DF,  p-value: 0.3777
+
+
+##########################################
+####### 1st example:
+####### Simulate data with interventions
+set.seed(1)
+## sample size n
+n <- 4000
+
+## 5 predictor variables
+p  <- 5
+
+## simulate as independent Gaussian variables
+X <- matrix(rnorm(n*p),nrow=n)
+
+## divide data into observational (ExpInd=1) and interventional (ExpInd=2)
+ExpInd <- c(rep(1,n/2),rep(2,n/2))
+
+## for interventional data (ExpInd==2): change distribution
+X[ExpInd==2,] <- sweep(X[ExpInd==2,],2, 5*rnorm(p) ,FUN="*")
+
+## first two variables are the causal predictors of Y
+beta <- c(1,1,rep(0,p-2))
+
+## response variable Y
+Y <- as.numeric(X%*%beta + rnorm(n))
+
+## optinal: make last variable a child of Y (so last variable is non-causal for Y)
+X[,p] <- 0.3*Y + rnorm(n)
+
+####### Compute "Invariant Causal Prediction" Confidence Intervals
+icp <- ICP(X,Y,ExpInd)
+
+###### Print/plot/show summary of output
+print(icp)
+plot(icp)
+
+#### compare with linear model 
+cat("\n compare with linear model  \n")            
+print(summary(lm(Y~X)))
